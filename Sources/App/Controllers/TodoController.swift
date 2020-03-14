@@ -4,7 +4,7 @@ import Vapor
 /// Controls basic CRUD operations on `Todo`s.
 final class TodoController {
     /// Returns a list of all `Todo`s.
-    func index(_ req: Request) throws -> EventLoopFuture<[Todo]> {
+    func index(req: Request) throws -> EventLoopFuture<[Todo]> {
         let query = Todo.query(on: req.db)
         if let completed = req.query[Bool.self, at: "completed"] {
             query.filter(\.$completed == completed)
@@ -13,13 +13,13 @@ final class TodoController {
     }
 
     /// Returns a single `Todo`.
-    func view(_ req: Request) throws -> EventLoopFuture<Todo> {
+    func view(req: Request) throws -> EventLoopFuture<Todo> {
         return Todo.find(req.parameters.get("id"), on: req.db)
             .unwrap(or: Abort(.notFound))
     }
     
     /// Saves a decoded `Todo` to the database.
-    func create(_ req: Request) throws -> EventLoopFuture<Todo> {
+    func create(req: Request) throws -> EventLoopFuture<Todo> {
         struct Create: Content {
             var title: String
             var completed: Bool?
@@ -30,11 +30,11 @@ final class TodoController {
             title: create.title,
             completed: create.completed ?? false
         )
-        return todo.save(on: req.db).map { todo }
+        return todo.create(on: req.db).map { todo }
     }
     
     /// Updates fields on a `Todo`.
-    func update(_ req: Request) throws -> EventLoopFuture<Todo> {
+    func update(req: Request) throws -> EventLoopFuture<Todo> {
         struct Update: Content {
             var title: String?
             var completed: Bool?
@@ -56,16 +56,32 @@ final class TodoController {
     }
 
     /// Deletes a parameterized `Todo`.
-    func delete(_ req: Request) throws -> EventLoopFuture<HTTPStatus> {
+    func delete(req: Request) throws -> EventLoopFuture<HTTPStatus> {
         return Todo.find(req.parameters.get("id"), on: req.db)
             .unwrap(or: Abort(.notFound))
             .flatMap { $0.delete(on: req.db) }
-            .map { .ok }
+            .map { .noContent }
     }
     
-    func clear(_ req: Request) throws -> EventLoopFuture<HTTPStatus> {
+    func clear(req: Request) throws -> EventLoopFuture<HTTPStatus> {
         return Todo.query(on: req.db)
             .delete()
-            .map { .ok }
+            .map { .noContent }
+    }
+}
+
+extension TodoController: RouteCollection {
+    func boot(routes: RoutesBuilder) throws {
+        let me = TodoController()
+        
+        let todos = app.grouped("todos")
+        todos.get(use: me.index)
+        todos.post(use: me.create)
+        todos.delete(use: me.clear)
+
+        let todo = todos.grouped(":id")
+        todo.get(use: me.view)
+        todo.patch(use: me.update)
+        todo.delete(use: me.delete)
     }
 }

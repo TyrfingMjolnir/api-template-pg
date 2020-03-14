@@ -22,14 +22,5 @@ func routes(_ app: Application) throws {
         )
     }
 
-    // Example of configuring a controller
-    let todoController = TodoController()
-    let todos = app.grouped("todos")
-    let todo = todos.grouped(":id")
-    todos.get(use: todoController.index)
-    todo.get(use: todoController.view)
-    todos.post(use: todoController.create)
-    todo.patch(use: todoController.update)
-    todos.delete(use: todoController.clear)
-    todo.delete(use: todoController.delete)
+    try app.register(collection: TodoController())
 }
